@@ -14,24 +14,48 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.habittracker.model.Habit
-import com.example.habittracker.viewmodel.HabitViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitScreen(
-    viewModel: HabitViewModel
+fun HabitListScreen(
+    habits: List<Habit>,
+    snackbarMessage: String?,
+    onSnackbarShown: () -> Unit,
+    onAddClick: () -> Unit,
+    onEditClick: (Int) -> Unit,
+    onDeleteClick: (Int) -> Unit,
+    onToggleCompleted: (Int, Boolean) -> Unit
 ) {
-    val habits = viewModel.habits
+    val snackbarHostState = remember { SnackbarHostState() }
+    var localMessage by remember { mutableStateOf<String?>(null) }
 
-    var showAddDialog by remember { mutableStateOf(false) }
-    var editingHabit by remember { mutableStateOf<Habit?>(null) }
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            onSnackbarShown()
+        }
+    }
+
+    LaunchedEffect(localMessage) {
+        localMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            localMessage = null
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -40,17 +64,17 @@ fun HabitScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true }
-            ) {
+            FloatingActionButton(onClick = onAddClick) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "Добавить привычку"
                 )
             }
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         }
     ) { innerPadding ->
-
         if (habits.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -75,43 +99,18 @@ fun HabitScreen(
                     HabitCard(
                         habit = habit,
                         onCheckedChange = { checked ->
-                            viewModel.toggleCompleted(habit.id, checked)
+                            onToggleCompleted(habit.id, checked)
                         },
                         onEditClick = {
-                            editingHabit = habit
+                            onEditClick(habit.id)
                         },
                         onDeleteClick = {
-                            viewModel.deleteHabit(habit.id)
+                            onDeleteClick(habit.id)
+                            localMessage = "Привычка удалена"
                         }
                     )
                 }
             }
         }
-    }
-
-    if (showAddDialog) {
-        HabitDialog(
-            title = "Добавить привычку",
-            initialTitle = "",
-            initialDescription = "",
-            onDismiss = { showAddDialog = false },
-            onConfirm = { title, description ->
-                viewModel.addHabit(title, description)
-                showAddDialog = false
-            }
-        )
-    }
-
-    editingHabit?.let { habit ->
-        HabitDialog(
-            title = "Редактировать привычку",
-            initialTitle = habit.title,
-            initialDescription = habit.description,
-            onDismiss = { editingHabit = null },
-            onConfirm = { newTitle, newDescription ->
-                viewModel.updateHabit(habit.id, newTitle, newDescription)
-                editingHabit = null
-            }
-        )
     }
 }
